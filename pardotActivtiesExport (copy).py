@@ -1,13 +1,14 @@
 import requests
 import json
+from datetime import datetime
 
 how_many_records = 0
 
 tokenRequest = requests.post("https://login.salesforce.com/services/oauth2/token", data={
-   'password': '',
-   'username' : '',
-   'client_id' : '',
-   'client_secret' : '',
+   'password': 'yitBritenet12338axkJGP7dGa3ZF2u4kajjJ8p',
+   'username' : 'ryszard@genus.one',
+   'client_id' : '3MVG9WtWSKUDG.x43uSMGY0NnVzFhu6MpNNQjMc6.fxwz..xD..whoGuS2VkCr0zHbxZCHFBxCieHxcp5WuMR',
+   'client_secret' : '1D7E75BDC843D3452F1351B1E2AEA468BD8848BEBF3ABA76F9327F36C02F71A7',
    'grant_type' : 'password'}
    )
 
@@ -16,7 +17,7 @@ print('salesforce token obtained succesfully')
 
 session = requests.Session()
 headers_dict = {"Authorization": "Bearer " + auth_token_salesforce,
-                "Pardot-Business-Unit-Id" : "",
+                "Pardot-Business-Unit-Id" : "0Uv2p000000CaVdCAK",
                 "Accept" : "*/*",
                 'Content-Type': 'application/json; charset=utf-8'}
 session.headers.update(headers_dict)
@@ -81,8 +82,10 @@ while i < how_many_records:
     
     file1.write(line)
     file2.write(line)
-    
-  print('current_offset='+str(i))
+  
+  now = datetime.now()
+  current_time = now.strftime("%H:%M:%S")
+  print( str(current_time) + ' current_offset=' + str(i) )
   file1.close() 
   file2.close() 
   
