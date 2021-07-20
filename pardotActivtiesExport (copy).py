@@ -22,20 +22,20 @@ headers_dict = {"Authorization": "Bearer " + auth_token_salesforce,
                 "Accept": "*/*",
                 'Content-Type': 'application/json; charset=utf-8'}
 session.headers.update(headers_dict)
-file1 = open("activities.csv", "w")
-file2 = open("activities.txt", "w")
+file1 = open("activities2.csv", "w")
+file2 = open("activities2.txt", "w")
 
 columns = '"prospect_id","type_name","details","created_at","updated_at","campaign.id","campaign.name","activity_id","offset","link"'
 file1.write(columns)
 file2.write(columns)
-offset = 0
-endpoint = 'https://pi.pardot.com/api/visitorActivity/version/3/do/query?sort_by=prospect_id&sort_order=descending&format=json&offset=0'
+global_offset = 67400
+endpoint = 'https://pi.pardot.com/api/visitorActivity/version/3/do/query?sort_by=prospect_id&sort_order=descending&format=json&offset='
 
-url = endpoint + str(offset)
+url = endpoint + str(global_offset)
 r = requests.get(url, headers=session.headers)
 json_data = json.loads(r.text)
 # how_many_records = json_data['result']['total_results']
-how_many_records = 1600
+how_many_records = 500000
 print('there are ' + str(how_many_records) + ' records')
 
 
@@ -66,7 +66,7 @@ def parser(key, dict):
             return '""'
 
 
-how_many_workers = 15
+how_many_workers = 5
 
 
 def logic(worker_number):
@@ -75,11 +75,12 @@ def logic(worker_number):
     global file2
     global url
     global session
-    global offset_dict
     global how_many_workers
+    global global_offset
+    offset = global_offset + 200 * worker_number
 
-    while offset_dict[worker_number] < how_many_records:
-        url = endpoint + str(offset_dict[worker_number])
+    while offset < how_many_records:
+        url = endpoint + str(offset)
         r = requests.get(url, headers=session.headers)
         json_data = json.loads(r.text)
 
@@ -92,7 +93,7 @@ def logic(worker_number):
             line += ',' + str(parser('campaign_id', activity))
             line += ',' + str(parser('campaign_name', activity))
             line += ',' + str(parser('id', activity))
-            line += ',' + str(offset_dict[worker_number])
+            line += ',' + str(offset)
             line += ',' + str(parser('link_prospect_id', activity))
 
             file1.write(line)
@@ -100,18 +101,17 @@ def logic(worker_number):
 
         now = datetime.now()
         current_time = now.strftime("%H:%M:%S")
-        print(str(current_time) + ' current_offset=' + str(offset_dict[worker_number]))
+        print(str(current_time) + ' current_offset=' + str(offset))
 
-        offset_dict[worker_number] = offset_dict[worker_number] + 200 * how_many_workers
+        offset = offset + 200 * how_many_workers
 
-
-offset_dict = {}
-for i in range(how_many_workers):
-    offset_dict[i] = 200 * i
 
 with concurrent.futures.ThreadPoolExecutor() as ex:
     for i in range(how_many_workers):
-        ex.submit(logic, worker_number=i)
+        try:
+          ex.submit(logic, worker_number=i)
+        except Exception as exc:
+          print(exc)
 
 file1.close()
 file2.close() 
