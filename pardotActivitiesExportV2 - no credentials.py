@@ -25,6 +25,7 @@ headers_dict = {"Authorization": "Bearer " + auth_token_salesforce,
 session.headers.update(headers_dict)
 file1 = open("activitiesV2.csv", "w")
 file2 = open("activitiesV2.txt", "w")
+file3 = open("errors.txt", "w")
 
 columns = '"prospect_id","score","prospect_email_address","type_name","details","created_at","updated_at","campaign.id","campaign.name","activity_id","link"'
 file1.write(columns)
@@ -75,47 +76,30 @@ def parser(key, dict):
         else:
             return '""'
 
+exit = False
+lines = []
+errors = []
 def logic(worker_number):
     global endpoint
-    global file1
-    global file2
     global session
     global how_many_workers
     global prospects
+    global exit
+    global lines
+    global errors
 
     prospectNumber = worker_number
-    offset = 0
 
-    while prospectNumber < len(prospects) - 1:
+    while ((prospectNumber < len(prospects) - 1) and exit == False):
         prospect = prospects[prospectNumber]
         # print(prospect)
         url = endpoint + str(prospect['id'])
         r = requests.get(url, headers=session.headers)
-        json_data = json.loads(r.text)
-        how_many_results_left = json_data['result']['total_results']
-        print('this prospect has ' + str(how_many_results_left) + ' activities')
-    
-        for activity in json_data['result']['visitor_activity']:
-            line = ',\n' + str(parser('prospect_id', activity))
-            line += ',"' + str(prospect['score']) + '"'
-            line += ',"' + str(prospect['email']) + '"'
-            line += ',' + str(parser('type_name', activity))
-            line += ',' + str(parser('details', activity))
-            line += ',' + str(parser('created_at', activity))
-            line += ',' + str(parser('updated_at', activity))
-            line += ',' + str(parser('campaign_id', activity))
-            line += ',' + str(parser('campaign_name', activity))
-            line += ',' + str(parser('id', activity))
-            line += ',' + str(parser('link_prospect_id', activity))
-            file1.write(line)
-            file2.write(line)
-
-        whichIteration = 1
-        while (how_many_results_left - 200 > 0):
-            url = endpoint + str(prospect['id']) + str('&offset=') + str(whichIteration * 200)
-            print('this has more than 200 results -> entering loop with offset ' + str(whichIteration * 200))
-            r = requests.get(url, headers=session.headers)
+        if r.status_code == 200:
             json_data = json.loads(r.text)
+            how_many_results_left = json_data['result']['total_results']
+            print('this prospect has ' + str(how_many_results_left) + ' activities')
+        
             for activity in json_data['result']['visitor_activity']:
                 line = ',\n' + str(parser('prospect_id', activity))
                 line += ',"' + str(prospect['score']) + '"'
@@ -128,18 +112,49 @@ def logic(worker_number):
                 line += ',' + str(parser('campaign_name', activity))
                 line += ',' + str(parser('id', activity))
                 line += ',' + str(parser('link_prospect_id', activity))
-                file1.write(line)
-                file2.write(line)
-            how_many_results_left = how_many_results_left - 200
-            whichIteration = whichIteration + 1
-            
+                lines.append(line)
+                lines.append(line)
+
+            whichIteration = 1
+            while (how_many_results_left - 200 > 0):
+                url = endpoint + str(prospect['id']) + str('&offset=') + str(whichIteration * 200)
+                print('this has more than 200 results -> entering loop with offset ' + str(whichIteration * 200))
+                r = requests.get(url, headers=session.headers)
+                if r.status_code == 200:
+                    json_data = json.loads(r.text)
+                    for activity in json_data['result']['visitor_activity']:
+                        line = ',\n' + str(parser('prospect_id', activity))
+                        line += ',"' + str(prospect['score']) + '"'
+                        line += ',"' + str(prospect['email']) + '"'
+                        line += ',' + str(parser('type_name', activity))
+                        line += ',' + str(parser('details', activity))
+                        line += ',' + str(parser('created_at', activity))
+                        line += ',' + str(parser('updated_at', activity))
+                        line += ',' + str(parser('campaign_id', activity))
+                        line += ',' + str(parser('campaign_name', activity))
+                        line += ',' + str(parser('id', activity))
+                        line += ',' + str(parser('link_prospect_id', activity))
+                        lines.append(line)
+                        lines.append(line)
+                    how_many_results_left = how_many_results_left - 200
+                    whichIteration = whichIteration + 1
+                else:
+                     print('error!' + str(r.status_code))
+                    #  exit = True
+                     errors.append(str(r.status_code) + ' for a prospect with id ' + prospect['id'])
+                     break
+        else:
+            print('error!' + str(r.status_code))
+            # exit = True
+            errors.append(str(r.status_code) + ' for a prospect with id ' + prospect['id'])
+            break
         now = datetime.now()
         current_time = now.strftime("%H:%M:%S")
         print(str(current_time) + ' current_prospect_number = ' + str(prospectNumber))
         prospectNumber = prospectNumber + how_many_workers
     
 
-how_many_workers = 5
+how_many_workers = 15
 with concurrent.futures.ThreadPoolExecutor() as ex:
     for i in range(how_many_workers):
         try:
@@ -147,5 +162,13 @@ with concurrent.futures.ThreadPoolExecutor() as ex:
         except Exception as exc:
           print(exc)
 
+for line in lines:
+    file1.write(line)
+    file2.write(line)
+
+for error in errors:
+    file3.write(error)
+
 file1.close()
 file2.close() 
+file3.close()
