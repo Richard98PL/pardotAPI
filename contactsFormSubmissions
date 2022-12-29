@@ -1,0 +1,76 @@
+import requests
+import json
+from datetime import datetime
+import csv
+
+URL = 'https://login.salesforce.com/services/oauth2/token?'
+URL += 'grant_type=password&'
+URL += 'client_id=.&'
+URL += 'client_secret=.&'
+URL += 'username=ryszard@genus.one&'
+URL += 'password=.'
+
+r = requests.post(url = URL)
+
+data = r.json()
+token = ''
+sfendpoint = ''
+sfheaders = ''
+
+if 'access_token' in data.keys():
+    sfendpoint = data['instance_url']
+    token = data['access_token']
+    sfheaders = {'Authorization' : 'Bearer ' + token, 'Content-Type' : 'application/json', 'Pardot-Business-Unit-Id' : '.'}
+    print(token)
+else:
+    print('error')
+
+endpoint = 'https://pi.pardot.com/api/prospect/version/3/do/query?format=json&fields=id,crm_contact_fid,email'
+
+r = requests.get(url = endpoint, headers = sfheaders)
+offset = 200
+
+allContactsEmails = {}
+allProspectFormSubmissions = {}
+while 'prospect' in r.json()['result']:
+    prospects = r.json()['result']['prospect']
+
+    for prospect in prospects:
+        if prospect['crm_contact_fid'] != None:
+            allContactsEmails[prospect['id']] = prospect['email']
+
+    endpoint += '&offset=' + str(offset)
+    r = requests.get(url = endpoint, headers = sfheaders)
+    offset += 200
+    print('currentOffsetOfProspects = ' + str(offset))
+
+
+offset = 200
+endpoint = 'https://pi.pardot.com/api/visitorActivity/version/3/do/query?format=json&type=4'
+r = requests.get(url = endpoint, headers = sfheaders)
+
+while 'visitor_activity' in r.json()['result']:
+    activities = r.json()['result']['visitor_activity']
+    email = allContactsEmails[prospect['id']]
+    for activity in activities:
+        if email not in allProspectFormSubmissions:
+             allProspectFormSubmissions[email] = []
+        allProspectFormSubmissions[email].append(datetime.strptime(activity['created_at'], '%Y-%m-%d %H:%M:%S'))
+
+    endpoint += '&offset=' + str(offset)
+    r = requests.get(url = endpoint, headers = sfheaders)
+    offset += 200
+    print('currentOffsetOfSubmissions = ' + str(offset))
+
+
+file = open('output.csv', 'w')
+row = ['email', 'form_submission_date']
+
+writer = csv.writer(file)
+writer.writerow(row)
+
+for email in allProspectFormSubmissions:
+    submissions = allProspectFormSubmissions[email]
+    for submission in submissions:
+        row = [email, submission]
+        writer.writerow(row)
