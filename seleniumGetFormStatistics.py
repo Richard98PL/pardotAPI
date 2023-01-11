@@ -22,9 +22,9 @@ def getSalesorceAuthDict():
     URL += '&'
     URL += 'client_id='
     URL += '&'
-    URL += 'client_secret=F'
+    URL += 'client_secret='
     URL += '&'
-    URL += 'username=u'
+    URL += 'username='
     URL += '&'
     URL += 'password='
 
@@ -47,7 +47,7 @@ def getForms(auth_dict):
     sfheaders = {'User-Agent' : 'Python', 
                  'Authorization' : 'Bearer ' + token,
                  'Content-Type' : 'application/json',
-                 'Pardot-Business-Unit-Id' : ''}
+                 'Pardot-Business-Unit-Id' : '0Uv2p000000CaVdCAK'}
 
     r = requests.get(url=queryUrl,headers=sfheaders)
 
@@ -215,7 +215,7 @@ for form in forms:
 
     print(j)
     j = j + 1
-    if j > 15:
+    if j > 200:
         break
 
 file.close()
